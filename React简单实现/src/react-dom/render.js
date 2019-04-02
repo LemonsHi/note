@@ -32,11 +32,20 @@ function createComponent (component, props) {
 }
 
 /**
+ * 组件卸载生命周期
+ * @param  {[type]} component 组件
+ */
+export function unmountComponent(component) {
+  if (component.componentWillUnmount) component.componentWillUnmount()
+  removeNode(component.base)
+}
+
+/**
  * 设置组件 props
  * component: 类组件
  * props: 属性值(vnode.attrs)
  */
-function setComponentProps (component, props) {
+export function setComponentProps (component, props) {
   // 通过 component.base 来观察, 该组件是否是首次创建
   // 1. 首次创建, 执行 React 生命周期中的 componentWillMount 方法
   // 2. 非首次创建(父组件重新 render() props 改变), 执行 componentWillReceiveProps 方法
@@ -71,6 +80,7 @@ export function renderComponent (component) {
   if (component.componentDidMount) component.componentDidMount()
 
   // 用当前的节点替换父节点的一个子节点, 并返回被替换掉的节点
+  // 并不是最好的更新方式 -- diff 算法可以解决这个问题
   if (component.base && component.base.parentNode) {
     component.base.parentNode.replaceChild(base, component.base)
   }
@@ -115,5 +125,6 @@ function _render ( vnode ) {
 }
 
 export function render (vnode, container) {
+  console.log(vnode);
   return container.appendChild(_render(vnode))
 }

@@ -13,6 +13,8 @@ export function setAttribute (dom, name, value) {
   if (name === 'className') name = 'class'
 
   // 对 onXXX 属性进行设置
+  // 只是单纯的将 onClick 变成 onclick 然后绑定事件
+  // 可以做个事件优化处理 -> 事件代理, 集中控制
   if (/on\w+/.test(name)) {
     name = name.toLocaleLowerCase()
     dom[name] = value || ''
