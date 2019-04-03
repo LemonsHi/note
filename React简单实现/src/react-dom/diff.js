@@ -3,8 +3,10 @@
 /***********************************************************************************************/
 import {
   setComponentProps,
-  unmountComponent
+  unmountComponent,
+  createComponent
 } from './render'
+import { setAttribute } from './dom'
 
 /**
  * diff 算法入口
@@ -13,8 +15,12 @@ import {
  * @param  {HTMLElement} container dom 容器
  * @return {HTMLElement}           更新后的 dom
  */
-function diff (dom, vnode, container) {
-
+export function diff (dom, vnode, container) {
+  const ret = diffNode(dom, vnode)
+  if (container && ret.parentNode !== container) {
+    container.appendChild(ret)
+  }
+  return ret
 }
 
 /**
@@ -23,7 +29,7 @@ function diff (dom, vnode, container) {
  * @param  {vnode}       vnode 虚拟 dom
  * @return {HTMLElement}       更新后的 dom
  */
-function diffNode (dom, vnode) {
+export function diffNode (dom, vnode) {
 
   let out = dom;
   if (vnode === undefined || vnode === null || typeof vnode === 'boolean') vnode = '';
@@ -72,6 +78,10 @@ function diffNode (dom, vnode) {
   if (vnode.children && vnode.children.length > 0 || (out.childNodes && out.childNodes.length > 0)) {
     diffChildren(out, vnode.children)
   }
+
+  diffAttributes(out, vnode)
+
+  return out
 }
 
 /**
@@ -116,6 +126,8 @@ function diffComponent(dom, vnode) {
 
 /**
  * 子节点级别的 diff 算法
+ * 如果 key 值相同，只是移动位置
+ * 如果 key 值不同，新增元素
  * @param  {[type]} dom       真实 dom 元素
  * @param  {[type]} vchildren 虚拟 vnode 元素子节点
  * @return {[type]}           [description]
@@ -123,6 +135,7 @@ function diffComponent(dom, vnode) {
 function diffChildren (dom, vchildren) {
   // 获取真实 dom 元素子节点
   const domChildren = dom.childNodes
+  // 存放没有 key 值的元素
   const children = []
 
   const keyed = {}
@@ -139,12 +152,15 @@ function diffChildren (dom, vchildren) {
     }
   }
 
+  // 虚拟元素是否存在子节点
   if (vchildren && vchildren.length > 0) {
     let min = 0
+    // 无 key 值的真实元素
     let childrenLen = children.length
 
     for (var i = 0; i < vchildren.length; i++) {
       const vchild = vchildren[i]
+      // 虚拟节点的 key 值
       const key = vchild.key
       let child
 
@@ -168,7 +184,9 @@ function diffChildren (dom, vchildren) {
         }
       }
       // 递归进行 diff 对比
-      child = diff(child, vchild)
+      child = diffNode(child, vchild)
+      // child 为更新后的元素 -> out 对象
+      // 更新真实 dom 元素
       const f = domChildren[i]
       if (child && child !== dom && child !== f) {
         if (!f) {

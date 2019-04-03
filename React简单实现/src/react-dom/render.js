@@ -4,13 +4,14 @@
 
 import Component from '../react/component'
 import { setAttribute } from './dom'
+import { diff, diffNode } from './diff'
 
 /**
  * 创建组件
  * component: 组件(类组件、函数组件)
  * props: 属性值(vnode.attrs)
  */
-function createComponent (component, props) {
+export function createComponent (component, props) {
   let inst
   // 类组件
   if (component.prototype && component.prototype.render) {
@@ -70,7 +71,9 @@ export function renderComponent (component) {
   }
 
   // 执行 render
-  base = _render(renderer)
+  // base = _render(renderer)
+  // diff 算法更新，渲染
+  base = diffNode(component.base, renderer)
 
   // 判断是否为更新操作, 执行 componentDidUpdate 生命周期
   if (component.base && component.componentDidUpdate ) {
@@ -81,50 +84,54 @@ export function renderComponent (component) {
 
   // 用当前的节点替换父节点的一个子节点, 并返回被替换掉的节点
   // 并不是最好的更新方式 -- diff 算法可以解决这个问题
-  if (component.base && component.base.parentNode) {
-    component.base.parentNode.replaceChild(base, component.base)
-  }
+  // if (component.base && component.base.parentNode) {
+  //   component.base.parentNode.replaceChild(base, component.base)
+  // }
 
   component.base = base
   base._component = component
 }
 
-function _render ( vnode ) {
+function _render (vnode, container) {
 
-  if (vnode === undefined || vnode === null || typeof vnode === 'boolean') vnode = ''
-  // 如果 vnode 为数值, 将其转换成字符串
-  if (typeof vnode === 'number') vnode = String(vnode)
-  // 如果 vnode 为文本, 将其转换成字符串
-  if (typeof vnode === 'string') {
-    let textNode = document.createTextNode(vnode)
-    return textNode
+  if (vnode === undefined) return
+  if (vnode.isReactComponent) {
+    const component = vnode
+    if (component._container && component.componentWillUpdate) {
+      component.componentWillUpdate()
+    }
+    if (!component._container && component.componentWillMount) {
+      component.componentWillMount()
+    }
+    component._container = container
+    vnode = component.render()
   }
-  // 如果 vnode 为组件
-  if (typeof vnode.tag === 'function') {
-    // 创建组件
-    const component = createComponent(vnode.tag, vnode.attrs)
-    // 设置 porps 值, 执行生命周期函数
-    setComponentProps(component, vnode.attrs)
-    return component.base
+
+  if (typeof vnode === 'string' || typeof vnode === 'number') {
+    let textNode = document.createTextNode( vnode )
+    return container.appendChild( textNode )
   }
 
   const dom = document.createElement(vnode.tag)
-  // 设置元素属性
+
   if (vnode.attrs) {
     Object.keys(vnode.attrs).forEach(key => {
       const value = vnode.attrs[key]
-      setAttribute(dom, key, value)
+      if (key === 'className') key = 'class'
+      // 如果是事件监听函数，则直接附加到dom上
+      if (typeof value === 'function') {
+        dom[key.toLowerCase()] = value
+      } else {
+        dom.setAttribute(key, vnode.attrs[key])
+      }
     })
   }
-  // 递归生成子元素
   if (vnode.children) {
-    vnode.children.forEach(child => render(child, dom))
+    vnode.children.forEach(child => _render(child, dom))
   }
-
-  return dom
+  return container.appendChild(dom)
 }
 
-export function render (vnode, container) {
-  console.log(vnode);
-  return container.appendChild(_render(vnode))
+export function render (vnode, container, dom) {
+  return diff(dom, vnode, container)
 }
